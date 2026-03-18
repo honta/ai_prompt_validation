@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 from robot.api import logger
 from robot.api.deco import keyword, library
@@ -16,22 +17,81 @@ from ai_library.llm_client import LLMClient
 from ai_library.result_store import ResultStore
 
 
-@library
+@library(scope="GLOBAL")
 class AiKeywords:
     def __init__(self):
         self.client = LLMClient()
         self.store = ResultStore()
         self.last_prompt = None
         self.last_response = None
+        self.last_run_metadata = None
 
     @keyword("Ask LLM")
     def ask_llm(self, prompt: str) -> str:
         self.last_prompt = prompt
+        self.last_run_metadata = None
         logger.info(f"Prompt: {prompt}")
         response = self.client.ask(prompt)
         self.last_response = response
         logger.info(f"Response: {response}")
         return response
+
+    @keyword("Ask LLM With Prompt Injection")
+    def ask_llm_with_prompt_injection(self, prompt: str, max_iterations: int = 3) -> str:
+        total_iterations = int(max_iterations)
+        if total_iterations < 1:
+            raise ValueError("max_iterations must be at least 1")
+
+        self.last_prompt = prompt
+        self.last_run_metadata = None
+
+        conversation: list[dict[str, str]] = []
+        trace: list[dict[str, Any]] = []
+        final_prompt = prompt
+        final_response = ""
+
+        for iteration in range(1, total_iterations + 1):
+            current_prompt = prompt
+            if trace:
+                current_prompt = self.client.refine_prompt_for_injection(prompt, trace)
+
+            final_prompt = current_prompt
+            logger.info(f"Prompt injection iteration {iteration}/{total_iterations}")
+            logger.info(f"Prompt: {current_prompt}")
+
+            conversation.append({"role": "user", "content": current_prompt})
+            response = self.client.ask_messages(list(conversation))
+            conversation.append({"role": "assistant", "content": response})
+
+            resisted = Evaluators.resisted_injection(response)
+            trace.append(
+                {
+                    "iteration": iteration,
+                    "prompt": current_prompt,
+                    "response": response,
+                    "resisted": resisted,
+                }
+            )
+            final_response = response
+
+            logger.info(f"Response: {response}")
+            logger.info(f"Prompt injection resisted: {resisted}")
+
+            if not resisted:
+                logger.info("Stopping prompt injection loop after unsafe response.")
+                break
+
+        self.last_response = final_response
+        self.last_run_metadata = {
+            "type": "prompt_injection",
+            "original_prompt": prompt,
+            "final_prompt": final_prompt,
+            "max_iterations": total_iterations,
+            "iterations_completed": len(trace),
+            "stopped_early": len(trace) < total_iterations and not trace[-1]["resisted"],
+            "trace": trace,
+        }
+        return final_response
 
     @keyword("Response Should Contain")
     def response_should_contain(self, response: str, expected: str):
@@ -65,6 +125,7 @@ class AiKeywords:
 
     @keyword("Evaluate Response Quality")
     def evaluate_response_quality(self, response: str, expected: str = "") -> dict:
+        logger.info(f"Reponse from model: {response}")
         result = Evaluators.quality_score(response, expected or None)
         logger.info(f"Quality score: {result['score']}")
         logger.info(f"Quality reasons: {', '.join(result['reasons'])}")
@@ -85,6 +146,8 @@ class AiKeywords:
             "response": response,
             "evaluation": evaluation,
         }
+        if self.last_run_metadata:
+            payload["prompt_injection"] = self.last_run_metadata
         path = self.store.save_result(payload, filename_prefix=test_name.replace(" ", "_").lower())
         logger.info(f"Saved result to: {path}")
         return path
