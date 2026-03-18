@@ -2,3 +2,5 @@
 .env
 *.html
 output.xml
+*.pyc
+
