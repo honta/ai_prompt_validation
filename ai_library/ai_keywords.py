@@ -25,6 +25,7 @@ class AiKeywords:
         self.last_prompt = None
         self.last_response = None
         self.last_run_metadata = None
+        self.last_evaluation_metadata = None
 
     @keyword("Ask LLM")
     def ask_llm(self, prompt: str) -> str:
@@ -59,9 +60,13 @@ class AiKeywords:
             logger.info(f"Prompt injection iteration {iteration}/{total_iterations}")
             logger.info(f"Prompt: {current_prompt}")
 
-            conversation.append({"role": "user", "content": current_prompt})
+            conversation.append(
+                self.client.render_message("prompt_injection", "attack_user", prompt=current_prompt)
+            )
             response = self.client.ask_messages(list(conversation))
-            conversation.append({"role": "assistant", "content": response})
+            conversation.append(
+                self.client.render_message("chat", "assistant_history", content=response)
+            )
 
             resisted = Evaluators.resisted_injection(response)
             trace.append(
@@ -125,10 +130,37 @@ class AiKeywords:
 
     @keyword("Evaluate Response Quality")
     def evaluate_response_quality(self, response: str, expected: str = "") -> dict:
+        self.last_evaluation_metadata = None
         logger.info(f"Reponse from model: {response}")
         result = Evaluators.quality_score(response, expected or None)
         logger.info(f"Quality score: {result['score']}")
         logger.info(f"Quality reasons: {', '.join(result['reasons'])}")
+        return result
+
+    @keyword("Evaluate Response Quality with LLM")
+    def evaluate_response_quality_with_llm(
+        self,
+        response: str,
+        expected: str = "",
+        system_prompt: str = "",
+        model: str = "gpt-5.4",
+    ) -> dict:
+        logger.info(f"Response from model for LLM evaluation: {response}")
+        result = self.client.evaluate_response_quality_with_llm(
+            response=response,
+            expected=expected or None,
+            system_prompt=system_prompt,
+            model=model,
+        )
+        self.last_evaluation_metadata = {
+            "type": "llm_quality_evaluation",
+            "judge_model": result["judge_model"],
+            "judge_prompt_name": result["judge_prompt_name"],
+        }
+        if "judge_summary" in result:
+            self.last_evaluation_metadata["judge_summary"] = result["judge_summary"]
+        logger.info(f"LLM quality score: {result['score']}")
+        logger.info(f"LLM quality reasons: {', '.join(result['reasons'])}")
         return result
 
     @keyword("Quality Score Should Be At Least")
@@ -148,6 +180,8 @@ class AiKeywords:
         }
         if self.last_run_metadata:
             payload["prompt_injection"] = self.last_run_metadata
+        if self.last_evaluation_metadata:
+            payload["evaluation_llm"] = self.last_evaluation_metadata
         path = self.store.save_result(payload, filename_prefix=test_name.replace(" ", "_").lower())
         logger.info(f"Saved result to: {path}")
         return path

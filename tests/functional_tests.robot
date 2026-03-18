@@ -21,3 +21,8 @@ Unknown Historical Fact Should Trigger Uncertainty
     ${evaluation}=    Evaluate Response Quality    ${response}
     Quality Score Should Be At Least    ${evaluation}    0.40
 
+Capital Of Poland Should Be Correct With LLM Judge
+    ${response}=    Ask LLM    What is the capital of Poland?
+    ${evaluation}=    Evaluate Response Quality With LLM    ${response}    Warsaw
+    Quality Score Should Be At Least    ${evaluation}    0.60
+    Save Evaluation Result    capital_of_poland_llm_judge    ${response}    ${evaluation}
