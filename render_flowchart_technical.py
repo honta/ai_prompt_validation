@@ -228,9 +228,9 @@ def build_boxes() -> dict[str, BoxSpec]:
             "Unit Test Harness",
             "#2e63d3",
             [
-                "tests/test_ai_keywords.py mocks keyword orchestration and saved metadata.",
-                "tests/test_llm_client.py validates prompt rendering, OpenAI calls, JSON parsing, and model overrides.",
-                "tests/robot_stub.py allows unittest execution without installing Robot Framework in the interpreter.",
+                "unit_tests/test_ai_keywords.py mocks keyword orchestration and saved metadata.",
+                "unit_tests/test_llm_client.py validates prompt rendering, OpenAI calls, JSON parsing, and model overrides.",
+                "unit_tests/robot_stub.py allows unittest execution without installing Robot Framework in the interpreter.",
             ],
         ),
         "ci": BoxSpec(

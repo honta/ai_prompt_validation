@@ -25,7 +25,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run Robot Framework tests
-        run: robot -d results tests/
+        run: robot --pythonpath . -d results tests/
 
       - name: Upload Robot results
         uses: actions/upload-artifact@v4

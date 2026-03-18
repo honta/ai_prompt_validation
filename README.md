@@ -45,8 +45,10 @@ ai_library/
 tests/
   functional_tests.robot
   prompt_injection.robot
+unit_tests/
   test_ai_keywords.py
   test_llm_client.py
+  robot_stub.py
 render_flowchart_technical.py
 README.md
 ```
@@ -110,7 +112,7 @@ robot -d results tests/
 Run unit tests:
 
 ```bash
-python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s unit_tests -v
 ```
 
 ## Results and Artifacts
@@ -128,3 +130,9 @@ GitHub Actions in [.github/workflows/workflow.yaml](/home/prd/other_projects/ai_
 
 - The flowchart renderer uses Pillow (`PIL`).
 - The current repository focuses on behavior validation and artifact capture; historical trend comparison is a logical next step for the results layer.
+
+## Example report
+
+- [RobotFramework report file](./example_report/report.html)
+- [RobotFramework log file](./example_report/log.html)
+

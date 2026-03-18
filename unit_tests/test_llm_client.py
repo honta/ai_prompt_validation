@@ -4,7 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from robot_stub import install_robot_stub
+from unit_tests.robot_stub import install_robot_stub
 
 install_robot_stub()
 
