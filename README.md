@@ -1,18 +1,14 @@
+# Intro
+LLM systems are non-deterministic, prone to hallucinations, and difficult to validate using traditional QA approaches.
+
+This project provides a framework for automated validation of AI systems, including consistency testing, hallucination detection, prompt injection resistance, and LLM-based evaluation.
+
+
 # AI Prompt Validation
 
 Robot Framework-based acceptance tests for LLM behavior, with reusable keywords for direct prompting, prompt-injection probing, rule-based scoring, and LLM-based quality judging.
 
 ![Technical workflow](./ai_prompt_validation_workflow_technical.png)
-
-## What This Repo Does
-
-- Sends prompts to an OpenAI chat model through a small Python library exposed as Robot Framework keywords.
-- Verifies core QA behaviors such as factual correctness, consistency, uncertainty handling, and prompt-injection resistance.
-- Supports iterative prompt-injection attempts where later attack prompts are refined with a GPT-5.4 model.
-- Supports two quality-evaluation modes:
-  - rule-based heuristics in Python
-  - LLM-based judging that returns strict JSON with `score` and `reasons`
-- Saves timestamped JSON results under `results/` for later review.
 
 ## Technical Workflow
 
@@ -24,13 +20,6 @@ At a high level:
 4. Heuristic checks are handled by [evaluators.py](/home/prd/other_projects/ai_prompt_validation/ai_library/evaluators.py).
 5. Saved JSON artifacts are written by [result_store.py](/home/prd/other_projects/ai_prompt_validation/ai_library/result_store.py).
 
-The generated technical diagram can be recreated with:
-
-```bash
-python3 render_flowchart_technical.py
-```
-
-This writes `ai_prompt_validation_workflow_technical.png` in the repo root.
 
 ## Project Structure
 
@@ -45,6 +34,9 @@ ai_library/
 tests/
   functional_tests.robot
   prompt_injection.robot
+  datasets/
+    functional_cases.csv
+    prompt_injection_cases.csv
 unit_tests/
   test_ai_keywords.py
   test_llm_client.py
@@ -72,33 +64,26 @@ export RESULTS_DIR=results
 
 You can also keep these values in `ai_library/.env`.
 
-## Available Keywords
-
-Main Robot keywords exposed by `AiKeywords`:
-
-- `Ask LLM`
-- `Ask LLM With Prompt Injection`
-- `Response Should Contain`
-- `Responses Should Be Consistent`
-- `Response Should Show Uncertainty`
-- `Response Should Resist Prompt Injection`
-- `Evaluate Response Quality`
-- `Evaluate Response Quality with LLM`
-- `Quality Score Should Be At Least`
-- `Save Evaluation Result`
-
 ### Example
+
+Example data-driven suite:
 
 ```robot
 *** Settings ***
+Library    DataDriver    file=datasets/functional_cases.csv    encoding=utf-8    dialect=excel
 Library    ai_library.ai_keywords.AiKeywords
+Test Template    Run Functional Dataset Case
 
 *** Test Cases ***
-Capital Of Poland Should Be Correct With LLM Judge
-    ${response}=    Ask LLM    What is the capital of Poland?
-    ${evaluation}=    Evaluate Response Quality With LLM    ${response}    Warsaw
-    Quality Score Should Be At Least    ${evaluation}    0.60
-    Save Evaluation Result    capital_of_poland_llm_judge    ${response}    ${evaluation}
+Functional Dataset Case
+    ${case_type}    ${prompt}    ${prompt_second}    ${expected}    ${min_score}    ${consistency_threshold}    ${result_id}
+```
+
+Matching CSV row:
+
+```csv
+*** Test Cases ***,${case_type},${prompt},${prompt_second},${expected},${min_score},${consistency_threshold},${result_id}
+"Capital of Poland should pass LLM judge","llm_judge","What is the capital of Poland?","","Warsaw","0.60","","capital_of_poland_llm_judge"
 ```
 
 ## Running Tests
@@ -108,6 +93,13 @@ Run Robot suites:
 ```bash
 robot -d results tests/
 ```
+
+The suites in `tests/` are data-driven:
+
+- [tests/datasets/functional_cases.csv](/home/prd/other_projects/ai_prompt_validation/tests/datasets/functional_cases.csv) defines the functional behavior cases.
+- [tests/datasets/prompt_injection_cases.csv](/home/prd/other_projects/ai_prompt_validation/tests/datasets/prompt_injection_cases.csv) defines the prompt-injection cases.
+- Each CSV row becomes a separate Robot test via `DataDriver`.
+- The first CSV column is `*** Test Cases ***`, followed by `${argument}` columns expected by the suite template.
 
 Run unit tests:
 
@@ -126,13 +118,9 @@ python3 -m unittest discover -s unit_tests -v
 
 GitHub Actions in [.github/workflows/workflow.yaml](/home/prd/other_projects/ai_prompt_validation/.github/workflows/workflow.yaml) runs Robot tests on push and pull request, using `OPENAI_API_KEY` from repository secrets and uploading the `results/` directory as an artifact.
 
-## Notes
-
-- The flowchart renderer uses Pillow (`PIL`).
-- The current repository focuses on behavior validation and artifact capture; historical trend comparison is a logical next step for the results layer.
-
 ## Example report
 
 - [RobotFramework report file](./example_report/report.html)
 - [RobotFramework log file](./example_report/log.html)
 
+![Example report screenshot](./example_report/example_report_screenshot.png)
