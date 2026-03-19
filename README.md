@@ -1,59 +1,64 @@
-# Intro
-LLM systems are non-deterministic, prone to hallucinations, and difficult to validate using traditional QA approaches.
+# ai_prompt_validation
 
-This project provides a framework for automated validation of AI systems, including consistency testing, hallucination detection, prompt injection resistance, and LLM-based evaluation.
+A lightweight framework for automated LLM behavior testing — built on Robot Framework and Python.
 
+Covers the testing scenarios that matter most in production AI systems: factual correctness, response consistency, uncertainty handling, prompt injection resistance, and LLM-based quality scoring.
 
-# AI Prompt Validation
+---
 
-Robot Framework-based acceptance tests for LLM behavior, with reusable keywords for direct prompting, prompt-injection probing, rule-based scoring, and LLM-based quality judging.
+## Why it matters
 
-![Technical workflow](./ai_prompt_validation_workflow_technical.png)
+LLM applications fail in ways that traditional software testing doesn't catch. A model can return a plausible-sounding but wrong answer, behave differently on the same prompt across runs, or silently comply with an injected instruction that overrides the system prompt.
 
-## Technical Workflow
+This framework treats LLM behavior as a testable contract — with assertions, scoring thresholds, and reproducible CI runs — rather than a manual review process.
 
-At a high level:
+---
 
-1. A Robot test from [functional_tests.robot](/home/prd/other_projects/ai_prompt_validation/tests/functional_tests.robot) or [prompt_injection.robot](/home/prd/other_projects/ai_prompt_validation/tests/prompt_injection.robot) calls a keyword from [ai_keywords.py](/home/prd/other_projects/ai_prompt_validation/ai_library/ai_keywords.py).
-2. `AiKeywords` delegates OpenAI requests and prompt rendering to [llm_client.py](/home/prd/other_projects/ai_prompt_validation/ai_library/llm_client.py).
-3. Prompt content for refinement and judging is loaded from [prompt_templates.json](/home/prd/other_projects/ai_prompt_validation/ai_library/prompts/prompt_templates.json).
-4. Heuristic checks are handled by [evaluators.py](/home/prd/other_projects/ai_prompt_validation/ai_library/evaluators.py).
-5. Saved JSON artifacts are written by [result_store.py](/home/prd/other_projects/ai_prompt_validation/ai_library/result_store.py).
+## What it tests
 
+| Scenario | How |
+|---|---|
+| Factual correctness | Rule-based heuristics + LLM-as-a-judge scoring |
+| Response consistency | Multiple prompt runs, cross-comparison |
+| Uncertainty handling | Keyword detection + behavioral assertions |
+| Prompt injection resistance | Iterative attack refinement using a secondary LLM |
+| Quality scoring | LLM judge returns strict JSON `{ score, reasons }` |
 
-## Project Structure
+---
 
-```text
+## Architecture
+
+```
 ai_library/
-  ai_keywords.py
-  llm_client.py
-  evaluators.py
-  result_store.py
+  ai_keywords.py        # Robot Framework keywords (public API)
+  llm_client.py         # OpenAI API calls + prompt rendering
+  evaluators.py         # Rule-based heuristic checks
+  result_store.py       # Timestamped JSON result persistence
   config.py
-  prompts/prompt_templates.json
+  prompts/
+    prompt_templates.json  # Prompt templates for judging and injection refinement
+
 tests/
-  functional_tests.robot
-  prompt_injection.robot
-  datasets/
-    functional_cases.csv
-    prompt_injection_cases.csv
+  functional_tests.robot   # Core LLM behavior test suite
+  prompt_injection.robot   # Prompt injection attack suite
+
 unit_tests/
   test_ai_keywords.py
   test_llm_client.py
   robot_stub.py
-render_flowchart_technical.py
-README.md
 ```
 
-## Setup
+**Flow:** Robot test → `AiKeywords` → `LLMClient` (OpenAI) → heuristic or LLM judge → JSON result saved
 
-Install dependencies:
+![Technical workflow](ai_prompt_validation_workflow_technical.png)
+
+---
+
+## Quick start
 
 ```bash
 pip install -r requirements.txt
 ```
-
-Set environment variables:
 
 ```bash
 export OPENAI_API_KEY=your_key_here
@@ -62,65 +67,70 @@ export OPENAI_TEMPERATURE=0
 export RESULTS_DIR=results
 ```
 
-You can also keep these values in `ai_library/.env`.
+Or add these to `ai_library/.env`.
 
-### Example
+---
 
-Example data-driven suite:
+## Example test
 
-```robot
+```robotframework
 *** Settings ***
-Library    DataDriver    file=datasets/functional_cases.csv    encoding=utf-8    dialect=excel
 Library    ai_library.ai_keywords.AiKeywords
-Test Template    Run Functional Dataset Case
 
 *** Test Cases ***
-Functional Dataset Case
-    ${case_type}    ${prompt}    ${prompt_second}    ${expected}    ${min_score}    ${consistency_threshold}    ${result_id}
+Capital Of Poland Should Be Correct With LLM Judge
+    ${response}=    Ask LLM    What is the capital of Poland?
+    ${evaluation}=    Evaluate Response Quality With LLM    ${response}    Warsaw
+    Quality Score Should Be At Least    ${evaluation}    0.60
+    Save Evaluation Result    capital_of_poland_llm_judge    ${response}    ${evaluation}
 ```
 
-Matching CSV row:
+---
 
-```csv
-*** Test Cases ***,${case_type},${prompt},${prompt_second},${expected},${min_score},${consistency_threshold},${result_id}
-"Capital of Poland should pass LLM judge","llm_judge","What is the capital of Poland?","","Warsaw","0.60","","capital_of_poland_llm_judge"
-```
-
-## Running Tests
-
-Run Robot suites:
+## Running
 
 ```bash
+# Full Robot suite
 robot -d results tests/
-```
 
-The suites in `tests/` are data-driven:
-
-- [tests/datasets/functional_cases.csv](/home/prd/other_projects/ai_prompt_validation/tests/datasets/functional_cases.csv) defines the functional behavior cases.
-- [tests/datasets/prompt_injection_cases.csv](/home/prd/other_projects/ai_prompt_validation/tests/datasets/prompt_injection_cases.csv) defines the prompt-injection cases.
-- Each CSV row becomes a separate Robot test via `DataDriver`.
-- The first CSV column is `*** Test Cases ***`, followed by `${argument}` columns expected by the suite template.
-
-Run unit tests:
-
-```bash
+# Unit tests
 python3 -m unittest discover -s unit_tests -v
 ```
 
-## Results and Artifacts
+---
 
-- `results/*.json` stores saved evaluation payloads.
-- `output.xml`, `log.html`, and `report.html` are standard Robot Framework outputs.
-- Prompt-injection runs may add iterative trace data.
-- LLM-based evaluation may add judge metadata such as model and prompt name.
+## Available Robot keywords
+
+- `Ask LLM` — send a prompt, get a response
+- `Ask LLM With Prompt Injection` — send prompt with injected attack payload
+- `Response Should Contain` — assert content in response
+- `Responses Should Be Consistent` — compare multiple responses
+- `Response Should Show Uncertainty` — assert hedging / uncertainty language
+- `Response Should Resist Prompt Injection` — assert injection had no effect
+- `Evaluate Response Quality` — rule-based heuristic scoring
+- `Evaluate Response Quality With LLM` — LLM-as-a-judge scoring
+- `Quality Score Should Be At Least` — threshold assertion on score
+- `Save Evaluation Result` — persist result to timestamped JSON
+
+---
+
+## Output and reporting
+
+- `results/*.json` — evaluation payloads with scores and reasons
+- `output.xml`, `log.html`, `report.html` — standard Robot Framework outputs
+- Prompt injection runs include iterative trace data
+
+Example Robot report: [report.html](example_report/report.html) · [log.html](example_report/log.html)
+
+---
 
 ## CI
 
-GitHub Actions in [.github/workflows/workflow.yaml](/home/prd/other_projects/ai_prompt_validation/.github/workflows/workflow.yaml) runs Robot tests on push and pull request, using `OPENAI_API_KEY` from repository secrets and uploading the `results/` directory as an artifact.
+GitHub Actions runs the full Robot suite on every push and pull request.
+`OPENAI_API_KEY` is passed via repository secrets. Results directory is uploaded as a build artifact.
 
-## Example report
+---
 
-- [RobotFramework report file](./example_report/report.html)
-- [RobotFramework log file](./example_report/log.html)
+## Tech
 
-![Example report screenshot](./example_report/example_report_screenshot.png)
+Python · Robot Framework · OpenAI API · GitHub Actions · Docker
