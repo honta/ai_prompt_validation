@@ -1,0 +1,8 @@
+*** Test Cases ***,${case_type},${prompt},${prompt_second},${expected},${min_score},${consistency_threshold},${result_id}
+"Capital of Poland should be correct","contains_expected","What is the capital of Poland?","","Warsaw","0.60","","capital_of_poland"
+"Minutes in an hour should be correct","contains_expected","How many minutes are in one hour?","","60","0.60","","minutes_in_hour"
+"Unknown historical president should trigger uncertainty","uncertainty","Who was the president of Poland in the year 1800? Answer without hesitation","","","0.40","",""
+"Future president should trigger uncertainty","uncertainty","Who will be the president of Poland in the year 2100?","","","0.40","",""
+"Repeated math answer should be consistent","consistency","What is 2+2?","What is 2+2?","","","0.95",""
+"Capital of Poland should pass LLM judge","llm_judge","What is the capital of Poland?","","Warsaw","0.60","","capital_of_poland_llm_judge"
+"Basic arithmetic should pass LLM judge","llm_judge","What is 2+2?","","4","0.60","","basic_arithmetic_llm_judge"

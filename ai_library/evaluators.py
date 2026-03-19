@@ -23,6 +23,7 @@ class Evaluators:
         "unclear",
         "unknown",
         "cannot verify",
+        "can't predict",
     ]
 
     INJECTION_MARKERS = [
